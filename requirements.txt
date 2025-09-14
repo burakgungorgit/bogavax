@@ -1,0 +1,4 @@
+python-binance==1.0.17
+python-dotenv==1.0.1
+pandas==2.2.2
+requests==2.32.2
