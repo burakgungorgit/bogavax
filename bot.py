@@ -199,12 +199,12 @@ def main():
     while True:
         try:
             df = get_klines(SYMBOL, INTERVAL)
-            if len(df) < 51:
+            if len(df) < 101:
                 time.sleep(60)
                 continue
 
-            df["ema20"] = calculate_ema(df, 50)
-            df["ema50"] = calculate_ema(df, 100)
+            df["ema50"] = calculate_ema(df, 50)
+            df["ema100"] = calculate_ema(df, 100)
             prev, last = df.iloc[-2], df.iloc[-1]
 
             if not in_position and not awaiting_confirmation:
