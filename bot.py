@@ -99,7 +99,7 @@ client.time_offset = -get_time_offset_ms()
 
 # --- Bot ayarları ---
 SYMBOL = "AVAXUSDT"
-INTERVAL = Client.KLINE_INTERVAL_30MINUTE
+INTERVAL = Client.KLINE_INTERVAL_15MINUTE
 COMMISSION = 0.001
 MIN_USDT = 10
 
@@ -199,23 +199,23 @@ def main():
     while True:
         try:
             df = get_klines(SYMBOL, INTERVAL)
-            if len(df) < 101:
+            if len(df) < 201:
                 time.sleep(60)
                 continue
 
-            df["ema50"] = calculate_ema(df, 50)
             df["ema100"] = calculate_ema(df, 100)
+            df["ema200"] = calculate_ema(df, 200)
             prev, last = df.iloc[-2], df.iloc[-1]
 
             if not in_position and not awaiting_confirmation:
-                if prev["ema50"] < prev["ema100"] and last["ema50"] > last["ema100"]:
+                if prev["ema100"] < prev["ema200"] and last["ema100"] > last["ema200"]:
                     write_log("Sinyal oluştu. Mum kapanışı bekleniyor.")
                     signal_time = str(last["timestamp"])
                     awaiting_confirmation = True
 
             elif awaiting_confirmation:
                 if str(last["timestamp"]) != signal_time:
-                    if last["ema50"] > last["ema100"]:
+                    if last["ema100"] > last["ema200"]:
                         usdt = get_balance("USDT")
                         price = float(client.get_symbol_ticker(symbol=SYMBOL)["price"])
                         qty = round_quantity(SYMBOL, usdt * 0.99 / price)
@@ -234,8 +234,8 @@ def main():
 
             elif in_position:
                 current = float(client.get_symbol_ticker(symbol=SYMBOL)["price"])
-                target = entry_price * 1.20
-                stop = entry_price * 0.90
+                target = entry_price * 1.065
+                stop = entry_price * 0.975
 
                 if current >= target or current <= stop:
                     total_qty = get_balance("AVAX")
