@@ -6,6 +6,10 @@ After=network.target
 User=ubuntu
 WorkingDirectory=/home/ubuntu/bogavax
 ExecStart=/home/ubuntu/bogavax/venv/bin/python /home/ubuntu/bogavax/bot.py
+
+# 🔑 ENV DOSYASINI BURADA YÜKLÜYORUZ
+EnvironmentFile=/home/ubuntu/bogavax/.env
+
 Restart=always
 RestartSec=30
 StandardOutput=append:/home/ubuntu/bogavax/log.txt
