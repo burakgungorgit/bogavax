@@ -141,6 +141,31 @@ def print_balances():
                 print(f"{b['asset']}: {b['free']}")
     except:
         pass
+# =========================================================
+# 🚨 BAŞLANGIÇ BAKİYE DOĞRULAMA (AWS / SERVICE KANITI)
+# =========================================================
+
+def startup_balance_check():
+    write_log("Başlangıç bakiye kontrolü yapılıyor...")
+
+    try:
+        account = client.get_account()
+        balances = account["balances"]
+
+        found = False
+        for b in balances:
+            free = float(b["free"])
+            if free > 0 and b["asset"] in ["USDT", "AVAX"]:
+                write_log(f"BAKİYE | {b['asset']} = {free}")
+                found = True
+
+        if not found:
+            write_log("UYARI: USDT veya AVAX bakiyesi bulunamadı!")
+
+        write_log("Başlangıç bakiye kontrolü tamamlandı.")
+
+    except Exception as e:
+        write_log(f"KRİTİK HATA: Binance bakiyesine erişilemiyor → {e}")
 
 # =========================================================
 # MARKET VERİLERİ
@@ -315,6 +340,8 @@ def calc_pnl(entry, current): return sell_price(current) - buy_price(entry)
 
 def main():
     write_log("Bot başlatıldı.")
+    startup_balance_check()
+
     state = load_state()
     in_position = state["in_position"]
     entry_price = state["entry_price"]
@@ -330,6 +357,8 @@ def main():
                 time.sleep(60)
                 continue
 
+            df['close'] = df['close'].astype(float)
+            
             df["ema100"] = calculate_ema(df, 100)
             df["ema200"] = calculate_ema(df, 200)
             prev, last = df.iloc[-2], df.iloc[-1]
