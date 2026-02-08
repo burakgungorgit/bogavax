@@ -120,6 +120,15 @@ COMMISSION = 0.001
 MIN_USDT = 10
 
 # =========================================================
+# STRATEJİ PARAMETRELERİ
+# =========================================================
+EMA_SHORT = 100
+EMA_LONG = 200
+STOP_LOSS_MULT = 0.975      # %2,5 zarar
+TAKE_PROFIT_MULT = 1.065   # %6,5 kâr
+
+
+# =========================================================
 # BAKİYE OKUMA
 # =========================================================
 
@@ -130,7 +139,9 @@ def get_balance(asset):
     except:
         return 0.0
 
-# --- Cüzdanı yazdır ---
+# =========================================================
+# CÜZDANI YAZDIR
+# =========================================================
 def print_balances():
     try:
         account = client.get_account()
@@ -192,117 +203,38 @@ def calculate_ema(df, period):
 # 🔒 LOT SIZE & PRECISION GÜVENLİK KATMANI
 # =========================================================
 
+# =========================================================
+# EMİR YUVARLA
+# =========================================================
+
 def round_quantity(symbol, qty):
-    """
-    Binance LOT_SIZE kuralına %100 uygun miktar üretir.
-    round() ASLA kullanılmaz.
-    Her zaman aşağı (floor) yuvarlanır.
-    """
     info = client.get_symbol_info(symbol)
     for f in info["filters"]:
         if f["filterType"] == "LOT_SIZE":
             step = float(f["stepSize"])
-            return math.floor(qty / step) * step
+            precision = int(round(-math.log(step, 10), 0))
+            return round(qty, precision)
     return qty
 
 # =========================================================
-# SEMBOL FILTRELERINI TEK SEFERDE
-# =========================================================
-
-def get_symbol_filters(symbol):
-    info = client.get_symbol_info(symbol)
-
-    filters = {
-        "step_size": None,
-        "min_qty": None,
-        "min_notional": None
-    }
-
-    for f in info["filters"]:
-        if f["filterType"] == "LOT_SIZE":
-            filters["step_size"] = float(f["stepSize"])
-            filters["min_qty"] = float(f["minQty"])
-
-        elif f["filterType"] == "MIN_NOTIONAL":
-            filters["min_notional"] = float(f["minNotional"])
-
-    return filters
-
-# =========================================================
-# stepSize garantili yuvarlama
-# =========================================================
-
-def round_step_size(qty, step_size):
-    return math.floor(qty / step_size) * step_size
-
-# =========================================================
-# %100 GUVENLI ALIM HESAPLAMA
-# =========================================================
-
-def get_safe_buy_qty(symbol, usdt_balance, price):
-    filters = get_symbol_filters(symbol)
-
-    step = filters["step_size"]
-    min_qty = filters["min_qty"]
-    min_notional = filters["min_notional"]
-
-    # %99 kullan → komisyon + fiyat oynaklığı tamponu
-    raw_qty = (usdt_balance * 0.99) / price
-    qty = round_step_size(raw_qty, step)
-
-    if qty < min_qty:
-        return 0
-
-    # minNotional + %10 güvenlik
-    if qty * price < min_notional * 1.1:
-        return 0
-
-    return qty
-
-# =========================================================
-# %100 GUVENLI SATIS HESAPLAMA
-# =========================================================
-
-def get_safe_sell_qty(symbol, asset_balance):
-    filters = get_symbol_filters(symbol)
-
-    step = filters["step_size"]
-    min_qty = filters["min_qty"]
-
-    # %99.9 sat → küsurat & fee güvenliği
-    raw_qty = asset_balance * 0.999
-    qty = round_step_size(raw_qty, step)
-
-    if qty < min_qty:
-        return 0
-
-    return qty
-
-# =========================================================
-# EMİR
+# MİN NOTİONAL
 # =========================================================
 
 def check_min_notional(symbol, qty, price):
     info = client.get_symbol_info(symbol)
-    min_notional = 10.0
-
-    for f in info['filters']:
-        if f['filterType'] == 'MIN_NOTIONAL':
-            min_notional = float(f['minNotional'])
-            break
-
-    # güvenlik tamponu
-    return qty * price >= min_notional * 1.1
-
+    for f in info["filters"]:
+        if f["filterType"] == "MIN_NOTIONAL":
+            return qty * price >= float(f["minNotional"])
+    return qty * price >= 10
 
 # =========================================================
-# EMIR GONDER
+# EMİR GÖNDER
 # =========================================================
 
 def place_order(symbol, side, qty, price):
     try:
         if not check_min_notional(symbol, qty, price):
-            write_log("Emir reddedildi: minimum notional değerin altında.")
+            write_log("Emir reddedildi: minimum notional altı.")
             return None
         return client.create_order(
             symbol=symbol,
@@ -315,7 +247,7 @@ def place_order(symbol, side, qty, price):
         return None
 
 # =========================================================
-# ORTALAMA GERCEKLESEN FIYAT
+# ORTALAMA FİYAT
 # =========================================================
 
 def get_avg_fill_price(order):
@@ -327,125 +259,89 @@ def get_avg_fill_price(order):
     return None
 
 # =========================================================
-# FİYAT & PNL
-# =========================================================
-
-def buy_price(p): return p * (1 + COMMISSION)
-def sell_price(p): return p * (1 - COMMISSION)
-def calc_pnl(entry, current): return sell_price(current) - buy_price(entry)
-
-# =========================================================
 # ANA DÖNGÜ
 # =========================================================
 
 def main():
-    write_log("Bot başlatıldı.")
+    write_log("AVAXUSDT Bot başlatıldı (%6,5 TP / %2,5 SL).")
+
+    # 🔍 BAŞLANGIÇ BAKİYE LOGU
     startup_balance_check()
 
     state = load_state()
     in_position = state["in_position"]
     entry_price = state["entry_price"]
-    write_log(f"Başlangıç durumu: in_position={in_position}, entry_price={entry_price}")
-    
     awaiting_confirmation = False
     signal_time = None
+
 
     while True:
         try:
             df = get_klines(SYMBOL, INTERVAL)
-            if len(df) < 201:
+            if len(df) < EMA_LONG + 2:
                 time.sleep(60)
                 continue
 
-            df['close'] = df['close'].astype(float)
-            
-            df["ema100"] = calculate_ema(df, 100)
-            df["ema200"] = calculate_ema(df, 200)
+            df["ema_short"] = calculate_ema(df, EMA_SHORT)
+            df["ema_long"] = calculate_ema(df, EMA_LONG)
             prev, last = df.iloc[-2], df.iloc[-1]
-            
-            # ---------------- ALIŞ ----------------
 
+            # --- Alım sinyali ---
             if not in_position and not awaiting_confirmation:
-                if prev["ema100"] < prev["ema200"] and last["ema100"] > last["ema200"]:
+                if prev["ema_short"] < prev["ema_long"] and last["ema_short"] > last["ema_long"]:
                     write_log("Sinyal oluştu. Mum kapanışı bekleniyor.")
                     signal_time = str(last["timestamp"])
                     awaiting_confirmation = True
 
             elif awaiting_confirmation:
                 if str(last["timestamp"]) != signal_time:
-                    if last["ema100"] > last["ema200"]:
-                        
+                    if last["ema_short"] > last["ema_long"]:
                         usdt = get_balance("USDT")
                         price = float(client.get_symbol_ticker(symbol=SYMBOL)["price"])
-                        
-                        qty = get_safe_buy_qty(SYMBOL, usdt, price)
-                        write_log(f"ALIM DEBUG | usdt={usdt} qty={qty} notional={qty*price}")
-                        
+                        qty = round_quantity(SYMBOL, usdt * 0.99 / price)
+
                         if usdt >= MIN_USDT and qty > 0:
                             order = place_order(SYMBOL, SIDE_BUY, qty, price)
                             if order:
                                 entry_price = get_avg_fill_price(order)
                                 in_position = True
                                 save_state({"in_position": True, "entry_price": entry_price})
-                                write_log(f"Alım yapıldı: {qty} AVAX @ {entry_price}")
+                                write_log(f"✅ Alım yapıldı: {qty} AVAX @ {entry_price}")
                         else:
                             write_log("Yetersiz bakiye.")
-                            
                     else:
                         write_log("Sinyal geçersizleşti.")
                     awaiting_confirmation = False
-            
-             # ---------------- SATIS ----------------
 
+            # --- Satış ---
             elif in_position:
                 current = float(client.get_symbol_ticker(symbol=SYMBOL)["price"])
-                target = entry_price * 1.065
-                stop = entry_price * 0.975
+                avax_balance = get_balance("AVAX")
+                sell_qty = round_quantity(SYMBOL, avax_balance * 0.99)
 
-                if current >= target or current <= stop:
-                    asset = SYMBOL.replace("USDT", "")
-                    balance = get_balance(asset)
-                    
-                     # %100 Binance uyumlu satış miktarı
-                    sell_qty = get_safe_sell_qty(SYMBOL, balance)
-                    write_log(
-            f"SATIŞ DEBUG | fiyat={current} hedef={target} stop={stop} "
-            f"bakiye={balance} sell_qty={sell_qty}")
-                    
-                    
+                if current <= entry_price * STOP_LOSS_MULT:
+                    write_log(f"🛑 %2,5 zarar stop-loss @ {current}")
+                    place_order(SYMBOL, SIDE_SELL, sell_qty, current)
+                    in_position = False
+                    entry_price = 0.0
+                    save_state({"in_position": False, "entry_price": 0.0})
 
-                    if sell_qty > 0:
-                        write_log(f"Satış sinyali: fiyat {current}, hedef {target}, stop {stop}")
-                        
-                        order = place_order(SYMBOL, SIDE_SELL, sell_qty, current)
-                        
-                        if order:
-                            sell = get_avg_fill_price(order) or current
-                            pnl = calc_pnl(entry_price, sell)
-                            result = "Kâr" if sell >= entry_price else "Zarar"
-                            
-                            write_log(f"{result}: {sell_qty} AVAX satıldı @ {sell} | PnL: {round(pnl, 3)}")
-                            
-                            in_position = False
-                            entry_price = 0.0
-                            save_state({"in_position": False, "entry_price": 0.0})
-                            
-                        else:
-                            write_log("Satış emri başarısız oldu.")
-                            
-                    else:
-                        write_log("Satış için yeterli AVAX yok.")
-                        
+                elif current >= entry_price * TAKE_PROFIT_MULT:
+                    write_log(f"✅ %6,5 kâr take-profit @ {current}")
+                    place_order(SYMBOL, SIDE_SELL, sell_qty, current)
+                    in_position = False
+                    entry_price = 0.0
+                    save_state({"in_position": False, "entry_price": 0.0})
 
         except Exception as e:
-            write_log_limited(f"Hata - döngü: {e}", key="loop_error")
-            write_log_limited("İnternet kopmuş olabilir. 60 saniye bekleniyor...", key="internet_wait")
+            write_log(f"Hata: {e}")
             time.sleep(60)
-            continue 
 
         time.sleep(60)
 
-# --- Başlat ---
+# =========================================================
+# BAŞLAT
+# =========================================================
+
 if __name__ == "__main__":
-    print_balances()
     main()
