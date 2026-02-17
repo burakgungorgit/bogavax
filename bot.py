@@ -122,7 +122,7 @@ MIN_USDT = 10
 # =========================================================
 # STRATEJİ PARAMETRELERİ
 # =========================================================
-EMA_SHORT = 100
+EMA_SHORT = 120
 EMA_LONG = 200
 STOP_LOSS_MULT = 0.975      # %2,5 zarar
 TAKE_PROFIT_MULT = 1.065   # %6,5 kâr
