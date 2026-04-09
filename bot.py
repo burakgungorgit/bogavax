@@ -114,16 +114,16 @@ client.time_offset = -get_time_offset_ms()
 # BOT AYARLARI
 # =========================================================
 
-SYMBOL = "AVAXUSDT"
-INTERVAL = Client.KLINE_INTERVAL_15MINUTE
+SYMBOL = "BTCUSDT"
+INTERVAL = Client.KLINE_INTERVAL_20MINUTE
 COMMISSION = 0.001
 MIN_USDT = 10
 
 # =========================================================
 # STRATEJİ PARAMETRELERİ
 # =========================================================
-EMA_SHORT = 100
-EMA_LONG = 200
+EMA_SHORT = 150
+EMA_LONG = 250
 STOP_LOSS_MULT = 0.975      # %2,5 zarar
 TAKE_PROFIT_MULT = 1.065   # %6,5 kâr
 
@@ -263,7 +263,7 @@ def get_avg_fill_price(order):
 # =========================================================
 
 def main():
-    write_log("AVAXUSDT Bot başlatıldı (%6,5 TP / %2,5 SL).")
+    write_log("BTCUSDT Bot başlatıldı (%6,5 TP / %2,5 SL).")
 
     # 🔍 BAŞLANGIÇ BAKİYE LOGU
     startup_balance_check()
@@ -306,7 +306,7 @@ def main():
                                 entry_price = get_avg_fill_price(order)
                                 in_position = True
                                 save_state({"in_position": True, "entry_price": entry_price})
-                                write_log(f"✅ Alım yapıldı: {qty} AVAX @ {entry_price}")
+                                write_log(f"✅ Alım yapıldı: {qty} BTC @ {entry_price}")
                         else:
                             write_log("Yetersiz bakiye.")
                     else:
@@ -316,7 +316,7 @@ def main():
             # --- Satış ---
             elif in_position:
                 current = float(client.get_symbol_ticker(symbol=SYMBOL)["price"])
-                avax_balance = get_balance("AVAX")
+                avax_balance = get_balance("BTC")
                 sell_qty = round_quantity(SYMBOL, avax_balance * 0.99)
 
                 if current <= entry_price * STOP_LOSS_MULT:
