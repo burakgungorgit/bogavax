@@ -115,17 +115,17 @@ client.time_offset = -get_time_offset_ms()
 # =========================================================
 
 SYMBOL = "BTCUSDT"
-INTERVAL = Client.KLINE_INTERVAL_20MINUTE
+INTERVAL = Client.KLINE_INTERVAL_15MINUTE
 COMMISSION = 0.001
 MIN_USDT = 10
 
 # =========================================================
 # STRATEJİ PARAMETRELERİ
 # =========================================================
-EMA_SHORT = 150
-EMA_LONG = 250
+EMA_SHORT = 600
+EMA_LONG = 900
 STOP_LOSS_MULT = 0.975      # %2,5 zarar
-TAKE_PROFIT_MULT = 1.065   # %6,5 kâr
+TAKE_PROFIT_MULT = 1.075   # %7,5 kâr
 
 
 # =========================================================
@@ -166,12 +166,12 @@ def startup_balance_check():
         found = False
         for b in balances:
             free = float(b["free"])
-            if free > 0 and b["asset"] in ["USDT", "AVAX"]:
+            if free > 0 and b["asset"] in ["USDT", "BTC"]:
                 write_log(f"BAKİYE | {b['asset']} = {free}")
                 found = True
 
         if not found:
-            write_log("UYARI: USDT veya AVAX bakiyesi bulunamadı!")
+            write_log("UYARI: USDT veya BTC bakiyesi bulunamadı!")
 
         write_log("Başlangıç bakiye kontrolü tamamlandı.")
 
@@ -263,7 +263,7 @@ def get_avg_fill_price(order):
 # =========================================================
 
 def main():
-    write_log("BTCUSDT Bot başlatıldı (%6,5 TP / %2,5 SL).")
+    write_log("BTCUSDT Bot başlatıldı (%7,5 TP / %2,5 SL).")
 
     # 🔍 BAŞLANGIÇ BAKİYE LOGU
     startup_balance_check()
@@ -327,7 +327,7 @@ def main():
                     save_state({"in_position": False, "entry_price": 0.0})
 
                 elif current >= entry_price * TAKE_PROFIT_MULT:
-                    write_log(f"✅ %6,5 kâr take-profit @ {current}")
+                    write_log(f"✅ %7,5 kâr take-profit @ {current}")
                     place_order(SYMBOL, SIDE_SELL, sell_qty, current)
                     in_position = False
                     entry_price = 0.0
