@@ -124,8 +124,8 @@ MIN_USDT = 10
 # =========================================================
 EMA_SHORT = 600
 EMA_LONG = 900
-STOP_LOSS_MULT = 0.975      # %2,5 zarar
-TAKE_PROFIT_MULT = 1.075   # %7,5 kâr
+STOP_LOSS_MULT = 0.970      # %3 zarar
+TAKE_PROFIT_MULT = 1.10   # %10 kâr
 
 
 # =========================================================
@@ -263,7 +263,7 @@ def get_avg_fill_price(order):
 # =========================================================
 
 def main():
-    write_log("BTCUSDT Bot başlatıldı (%7,5 TP / %2,5 SL).")
+    write_log("BTCUSDT Bot başlatıldı (%10 TP / %3 SL).")
 
     # 🔍 BAŞLANGIÇ BAKİYE LOGU
     startup_balance_check()
@@ -320,14 +320,14 @@ def main():
                 sell_qty = round_quantity(SYMBOL, avax_balance * 0.99)
 
                 if current <= entry_price * STOP_LOSS_MULT:
-                    write_log(f"🛑 %2,5 zarar stop-loss @ {current}")
+                    write_log(f"🛑 %3 zarar stop-loss @ {current}")
                     place_order(SYMBOL, SIDE_SELL, sell_qty, current)
                     in_position = False
                     entry_price = 0.0
                     save_state({"in_position": False, "entry_price": 0.0})
 
                 elif current >= entry_price * TAKE_PROFIT_MULT:
-                    write_log(f"✅ %7,5 kâr take-profit @ {current}")
+                    write_log(f"✅ %10 kâr take-profit @ {current}")
                     place_order(SYMBOL, SIDE_SELL, sell_qty, current)
                     in_position = False
                     entry_price = 0.0
