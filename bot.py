@@ -115,7 +115,7 @@ client.time_offset = -get_time_offset_ms()
 # =========================================================
 
 SYMBOL = "BTCUSDT"
-INTERVAL = Client.KLINE_INTERVAL_15MINUTE
+INTERVAL = Client.KLINE_INTERVAL_2HOUR
 COMMISSION = 0.001
 MIN_USDT = 10
 
